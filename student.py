@@ -46,14 +46,25 @@ def scale(X_train, X_test):
 
 def xavier(n_in, n_out):
     limit = np.sqrt(6) / np.sqrt(n_in + n_out)
-    # Changed this as the seed function was generating wrong numbers for this stage's test
     flat_weights = np.random.uniform(-limit, limit, n_in * n_out)
     return flat_weights.reshape((n_in, n_out))
 
 
 def sigmoid(x):
-    # Simplified the sigmoid 
     return 1 / (1 + np.exp(-x))
+
+
+def sigmoid_derivative(x):
+    return sigmoid(x) * (1 - sigmoid(x))
+
+
+def MSE(y_pred, y_true):
+    return float(np.mean((np.array(y_pred) - np.array(y_true)) ** 2))
+
+
+def MSE_derivative_i(y_pred, y_true):
+    return 2 * (np.array(y_pred) - np.array(y_true))
+
 
 # Class which computes and stores the next layer of the network
 class OneLayerNeural:
@@ -61,7 +72,6 @@ class OneLayerNeural:
     def __init__(self, n_features, n_classes):
         self.n_features = n_features
         self.n_classes = n_classes
-        # First the biases as the generation works for the project test
         self.biases = np.squeeze(xavier(1, n_classes))
         self.weights = xavier(n_features, n_classes)
 
@@ -75,7 +85,25 @@ class OneLayerNeural:
         self.z = z
         self.a = a
 
-        return a.flatten().tolist()
+        # FIX 1: Return the raw 2D NumPy array. Do not flatten here.
+        return a
+
+    def backprop(self, X, y, alpha):
+        # Get the number of samples in the batch (n)
+        n = y.shape[0]
+
+        # Calculate the error signal (delta)
+        delta = MSE_derivative_i(self.a, y) * sigmoid_derivative(self.z)
+
+        # Calculate the total gradients for weights and then average by batch size
+        weights_gradients = (1 / n) * np.dot(X.T, delta)
+
+        # Calculate the total gradients for biases and then average by batch size
+        biases_gradients = (1 / n) * delta
+
+        # Update weights and biases
+        self.weights = self.weights - alpha * weights_gradients
+        self.biases = self.biases - alpha * biases_gradients
 
 
 if __name__ == '__main__':
@@ -121,7 +149,20 @@ if __name__ == '__main__':
 
     # Apply the model to the first two items of the training dataset
     first_two_images = scaled_train[0:2]
-    results = nn_1.forward(first_two_images)
+    # Get the corresponding labels for these two images
+    first_two_labels = y_train[0:2]
+
+    # 1st forward step
+    forward_step1_results = nn_1.forward(X=first_two_images)
+
+    # Backpropagation step with the CORRECT labels
+    nn_1.backprop(X=first_two_images, y=first_two_labels, alpha=0.1)
+
+    # 2nd forward step
+    forward_step2_results = nn_1.forward(X=first_two_images)
 
     # Print the result
-    print(results)
+    print([MSE([-1,0,1,2], [4,3,2,1])],
+          MSE_derivative_i([-1,0,1,2], [4,3,2,1]).tolist(),
+          sigmoid_derivative(np.array([-1,0,1,2])).tolist(),
+          [MSE(y_train[0:2], forward_step2_results)])
